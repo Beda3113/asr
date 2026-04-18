@@ -1,0 +1,11 @@
+# @package _global_
+_target_: src.text_encoder.ctc_text_encoder.CTCTextEncoder
+
+# Decoder type: argmax, bs (beam search), bs_torch, bs_lm
+decoder_type: bs
+
+# Beam size for beam search (only used if decoder_type is bs, bs_torch, or bs_lm)
+beam_size: 10
+
+# Alphabet (if None, uses a-z + space)
+alphabet: null
