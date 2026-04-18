@@ -206,3 +206,112 @@ pytorch_project_template/                    # Корень проекта
 | **dev-other** | 314 MB | 2,864 | Валидация (сложная речь) |
 | **test-clean** | 346 MB | 2,620 | Тестирование (чистая речь) |
 | **test-other** | 328 MB | 2,939 | Тестирование (сложная речь) |
+
+
+# Работа с TODO в проекте
+
+## 1. `src/datasets/base_dataset.py`
+
+**Задача:** Применить wave-аугментации до вычисления спектрограммы.
+
+**Решение:**
+- Добавлен метод `apply_wave_augs()`
+- Изменён `__getitem__`: wave-augs → спектрограмма → spectral-augs
+
+**Результат:** Wave-аугментации (Gain, PitchShift, AddNoise) применяются до спектрограммы, spectral-аугментации (FreqMask, TimeMask) — после.
+
+---
+
+## 2. `src/text_encoder/ctc_text_encoder.py`
+
+**Задача:** Реализовать CTC decode и Beam Search.
+
+**Решение:**
+- `ctc_decode()` — удаление blank-символов и повторяющихся токенов
+- `ctc_beam_search()` — собственная реализация beam search без внешних библиотек
+
+
+---
+
+## 3. `src/model/deepspeech2.py`
+
+**Задача:** Создать полную модель DeepSpeech2.
+
+**Решение:**
+- CNN экстрактор (2 слоя с Hardtanh)
+- 5 слоёв BiGRU с BatchNorm и Dropout
+- Линейный классификатор
+
+
+---
+
+## 4. `src/transforms/` (4+ аугментации)
+
+**Задача:** Реализовать минимум 4 ASR-аугментации.
+
+**Решение:**
+- `gain.py` — изменение громкости (Wave)
+- `pitch_shift.py` — сдвиг тона (Wave)
+- `add_colored_noise.py` — добавление шума (Wave)
+- `freq_mask.py` — частотное маскирование (Spectral)
+- `time_mask.py` — временное маскирование (Spectral)
+
+
+---
+
+## 5. `src/model/__init__.py`
+
+**Задача:** Экспорт DeepSpeech2.
+
+**Решение:** Добавлен импорт и экспорт класса `DeepSpeech2`.
+
+
+---
+
+## 6. Конфиги Hydra (`src/configs/`)
+
+**Задача:** Настройка всех компонентов через YAML.
+
+**Решение:** Созданы конфиги для модели, токенизатора, аугментаций, loss, тренера, датасетов.
+
+
+---
+
+## 7. `src/logger/tensorboard_writer.py`
+
+**Задача:** Логирование без W&B.
+
+**Решение:** Создан `TensorBoardWriter` для записи loss, спектрограмм, аудио и таблиц с предсказаниями.
+
+
+---
+
+## 8. `src/datasets/librispeech_dataset.py`
+
+**Задача:** Поддержка `train-clean-460`.
+
+**Решение:** Добавлена обработка: `parts = ["train-clean-100", "train-clean-360"]`.
+
+---
+
+## 9. `src/metrics/utils.py`
+
+**Задача:** Реализация CER и WER.
+
+**Решение:** Функции `calc_cer()` и `calc_wer()` на основе `editdistance`.
+
+
+---
+
+## 10. `src/trainer/trainer.py`
+
+**Задача:** Исправление передачи аргументов в модель.
+
+**Решение:**
+- Явная передача `spectrogram` и `spectrogram_length`
+- Добавлена проверка `batch is None`
+- Обработка ошибок метрик через `try/except`
+
+
+---
+
