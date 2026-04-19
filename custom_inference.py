@@ -14,16 +14,11 @@ sys.path.insert(0, '/content/asr')
 from src.model.deepspeech2 import DeepSpeech2
 from src.text_encoder.ctc_text_encoder import CTCTextEncoder
 from src.datasets.custom_dir_audio_dataset import CustomDirAudioDataset
-from src.metrics.utils import calc_cer, calc_wer
-
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-BEAM_SIZE = 15
 N_TOKENS = 29
 
 print(f"Device: {DEVICE}")
-print(f"Beam Size: {BEAM_SIZE}")
-
 
 def normalize_text(text: str) -> str:
     text = text.lower()
@@ -31,9 +26,17 @@ def normalize_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
+def ctc_decode(log_probs, text_encoder, blank_idx=0):
+    pred_ids = torch.argmax(log_probs, dim=-1)
+    pred_ids = torch.unique_consecutive(pred_ids, dim=-1)
+    pred_ids = pred_ids[pred_ids != blank_idx]
+    if len(pred_ids) == 0:
+        return ""
+    pred_ids_list = pred_ids.cpu().tolist()
+    decoded = ''.join([text_encoder.ind2char[idx] for idx in pred_ids_list])
+    return decoded
 
 print("\nLoading model...")
-
 model = DeepSpeech2(
     n_tokens=N_TOKENS,
     n_feats=80, 
@@ -46,7 +49,6 @@ model = DeepSpeech2(
 checkpoint = torch.load("checkpoint-epoch50.pth", map_location=DEVICE)
 print(f"Checkpoint: epoch {checkpoint.get('epoch', 'unknown')}")
 
-# Weight adaptation
 checkpoint_state = checkpoint['state_dict']
 if checkpoint_state['fc.weight'].shape[0] == 28 and model.fc.weight.shape[0] == 29:
     print("Adapting weights: 28 -> 29 classes")
@@ -64,9 +66,7 @@ model.to(DEVICE)
 model.eval()
 print("Model loaded")
 
-
 text_encoder = CTCTextEncoder()
-
 
 AUDIO_DIR = "/content/asr/custom_dir/audio"
 TRANS_DIR = "/content/asr/custom_dir/transcriptions"
@@ -84,58 +84,20 @@ dataset = CustomDirAudioDataset(
 )
 print(f"Dataset: {len(dataset)} examples")
 
-def ctc_decode(log_probs, text_encoder, blank_idx=0):
-    """
-    CTC greedy decode (argmax + remove blanks + remove duplicates)
-    
-    Args:
-        log_probs: torch.Tensor [T, n_tokens] - log probabilities
-        text_encoder: CTCTextEncoder instance
-        blank_idx: int - index of blank token (default 0)
-    
-    Returns:
-        str: decoded text
-    """
-    # Argmax over last dimension
-    pred_ids = torch.argmax(log_probs, dim=-1)  # [T]
-    
-    # Remove consecutive duplicates
-    pred_ids = torch.unique_consecutive(pred_ids, dim=-1)
-    
-    # Remove blank tokens
-    pred_ids = pred_ids[pred_ids != blank_idx]
-    
-    # Convert tensor to Python list
-    pred_ids_list = pred_ids.cpu().tolist()
-    
-    # Decode to text
-    decoded = ''.join([text_encoder.ind2char[idx] for idx in pred_ids_list])
-    
-    return decoded
-
-
 results = []
 print("\nRunning inference with CTC greedy decode...\n")
 
 with torch.no_grad():
     for i, item in enumerate(dataset):
         spectrogram = item['spectrogram']
-        
         if spectrogram.dim() == 3:
             spectrogram = spectrogram.squeeze(0)
         spectrogram = spectrogram.unsqueeze(0).to(DEVICE)
         spectrogram_length = torch.tensor([spectrogram.shape[-1]]).to(DEVICE)
         
-        outputs = model(
-            spectrogram=spectrogram, 
-            spectrogram_length=spectrogram_length
-        )
-        
-        log_probs = outputs['log_probs'][0].cpu()  # [T, n_tokens]
-        
-        # CTC decode (greedy)
+        outputs = model(spectrogram=spectrogram, spectrogram_length=spectrogram_length)
+        log_probs = outputs['log_probs'][0].cpu()
         predicted_text = ctc_decode(log_probs, text_encoder, blank_idx=0)
-        
         target_text = normalize_text(item['text'])
         
         results.append({
@@ -149,7 +111,6 @@ with torch.no_grad():
             print(f"   Target: {target_text[:80]}")
             print(f"   Pred:   {predicted_text[:80]}\n")
 
-
 SAVE_DIR = Path("/content/asr/custom_predictions")
 SAVE_DIR.mkdir(exist_ok=True, parents=True)
 
@@ -161,45 +122,3 @@ for res in results:
         }, f, indent=2, ensure_ascii=False)
 
 print(f"\nSaved {len(results)} predictions to {SAVE_DIR}")
-
-
-print("RECOGNITION RESULTS")
-
-total_cer, total_wer = 0.0, 0.0
-cer_list, wer_list = [], []
-
-for res in results:
-    cer = calc_cer(res['target'], res['prediction'])
-    wer = calc_wer(res['target'], res['prediction'])
-    total_cer += cer
-    total_wer += wer
-    cer_list.append(cer)
-    wer_list.append(wer)
-    print(f"{res['file']}: CER={cer:.2%}, WER={wer:.2%}")
-
-print(f"Average CER: {total_cer/len(results):.2%}")
-print(f"Average WER: {total_wer/len(results):.2%}")
-
-# Median values
-cer_list.sort()
-wer_list.sort()
-print(f"Median CER: {cer_list[len(cer_list)//2]:.2%}")
-print(f"Median WER: {wer_list[len(wer_list)//2]:.2%}")
-
-
-print("\nRECOGNITION EXAMPLES:")
-
-# Best and worst examples
-wer_list_sorted = [(wer, idx) for idx, wer in enumerate(wer_list)]
-wer_list_sorted.sort()
-
-best_idx = wer_list_sorted[0][1]
-worst_idx = wer_list_sorted[-1][1]
-
-print(f"\nBest (WER={wer_list[best_idx]:.2%}):")
-print(f"   Target: {results[best_idx]['target']}")
-print(f"   Pred:   {results[best_idx]['prediction']}")
-
-print(f"\nWorst (WER={wer_list[worst_idx]:.2%}):")
-print(f"   Target: {results[worst_idx]['target']}")
-print(f"   Pred:   {results[worst_idx]['prediction']}")
