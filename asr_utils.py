@@ -1,4 +1,3 @@
-%%writefile utils.py
 import shutil
 from pathlib import Path
 
