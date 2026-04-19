@@ -1,0 +1,37 @@
+defaults:
+  - /model: deepspeech2
+  - /text_encoder: ctc_text_encoder
+  - /transforms: default
+  - _self_
+
+text_encoder:
+  _target_: src.text_encoder.ctc_text_encoder.CTCTextEncoder
+  decoder_type: bs
+  beam_size: 10
+
+inferencer:
+  device_tensors: ["spectrogram", "text_encoded"]
+  device: auto
+  from_pretrained: outputs/test_100/checkpoint-epoch50.pth
+  save_path: "test_clean/predictions"
+  seed: 42
+
+dataloader:
+  batch_size: 8
+  num_workers: 4
+  shuffle: false
+  pin_memory: true
+
+metrics:
+  inference:
+    - _target_: src.metrics.cer.CERMetric
+      name: cer
+    - _target_: src.metrics.wer.WERMetric
+      name: wer
+
+datasets:
+  test_clean:
+    _target_: src.datasets.librispeech_dataset.LibrispeechDataset
+    part: test-clean
+    target_sr: 16000
+    instance_transforms: ${transforms.instance_transforms.inference}
