@@ -418,5 +418,5 @@ python calc_metrics.py --pred_dir data/saved/dev_clean/predictions/dev
 | 45    | 0.2425     | 7.77%     | 28.37%    | 0.5720   | 14.65%  | 41.50%  |
 | 50    | 0.2055     | 6.50%     | 24.54%    | 0.5664   | 14.14%  | 40.19%  |
 
-
-
+## Логи, чекпоинты 
+https://disk.yandex.ru/d/7tvoCqipddD4QA
