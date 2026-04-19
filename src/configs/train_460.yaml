@@ -1,0 +1,83 @@
+# @package _global_
+
+defaults:
+  - /model: deepspeech2
+  - /text_encoder: ctc_text_encoder
+  - /loss: ctc_loss
+  - _self_
+
+trainer:
+  n_epochs: 100
+  save_period: 5
+  early_stop: 20
+  max_grad_norm: 1.0
+  device: "auto"
+  device_tensors: ["spectrogram", "text_encoded"]
+  log_step: 50
+  skip_oom: True
+  save_dir: "outputs"
+  monitor: "min val_cer"
+  seed: 42
+  override: True
+
+text_encoder:
+  _target_: src.text_encoder.ctc_text_encoder.CTCTextEncoder
+  decoder_type: argmax
+  beam_size: 10
+
+transforms:
+  batch_transforms:
+    train: null
+    inference: null
+
+writer:
+  _target_: src.logger.dummy.DummyWriter
+  run_name: "deepspeech2_460"
+  id_length: 8
+
+dataloader:
+  batch_size: 16
+  num_workers: 4
+  shuffle: true
+  pin_memory: true
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 0.0005
+  weight_decay: 0.0001
+
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+  T_max: 100
+  eta_min: 0.00001
+
+metrics:
+  train:
+    - _target_: src.metrics.cer.CERMetric
+      name: cer
+    - _target_: src.metrics.wer.WERMetric
+      name: wer
+  inference:
+    - _target_: src.metrics.cer.CERMetric
+      name: cer
+    - _target_: src.metrics.wer.WERMetric
+      name: wer
+
+paths:
+  output_dir: ${hydra:runtime.output_dir}
+
+datasets:
+  train:
+    _target_: src.datasets.librispeech_dataset.LibrispeechDataset
+    part: train-clean-460
+    target_sr: 16000
+    max_audio_length: 15
+    max_text_length: 300
+    shuffle_index: True
+  validation:
+    _target_: src.datasets.librispeech_dataset.LibrispeechDataset
+    part: dev-clean
+    target_sr: 16000
+    max_audio_length: 15
+    max_text_length: 300
+    shuffle_index: False

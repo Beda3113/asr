@@ -1,0 +1,4 @@
+# @package _global_
+_target_: src.text_encoder.ctc_text_encoder.CTCTextEncoder
+decoder_type: argmax
+beam_size: 10

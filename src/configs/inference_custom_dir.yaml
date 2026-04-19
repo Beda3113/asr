@@ -1,0 +1,48 @@
+# @package _global_
+
+defaults:
+  - /model: deepspeech2
+  - /text_encoder: ctc_text_encoder
+  - _self_
+
+inferencer:
+  device_tensors: ["spectrogram", "text_encoded"]
+  device: auto
+  from_pretrained: checkpoint-epoch50.pth
+  save_path: custom_predictions
+  seed: 42
+
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 4
+  num_workers: 2
+  shuffle: false
+  pin_memory: true
+
+metrics:
+  inference:
+    - _target_: src.metrics.cer.CERMetric
+      name: cer
+    - _target_: src.metrics.wer.WERMetric
+      name: wer
+
+transforms:
+  instance_transforms:
+    inference:
+      get_spectrogram:
+        _target_: torchaudio.transforms.MelSpectrogram
+        sample_rate: 16000
+        n_mels: 80
+        n_fft: 400
+        hop_length: 160
+        power: 1.0
+  batch_transforms:
+    train: null
+    inference: null
+
+datasets:
+  custom:
+    _target_: src.datasets.custom_dir_audio_dataset.CustomDirAudioDataset
+    audio_dir: null
+    transcription_dir: null
+    instance_transforms: ${transforms.instance_transforms.inference}

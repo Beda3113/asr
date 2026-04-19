@@ -1,0 +1,59 @@
+defaults:
+  - /model: deepspeech2
+  - /text_encoder: ctc_text_encoder
+  - _self_
+
+model:
+  _target_: src.model.deepspeech2.DeepSpeech2
+  n_tokens: 29
+  n_feats: 80
+  dim: 512
+  n_channels: 48
+  gru_layers: 5
+  dropout: 0.3
+
+text_encoder:
+  _target_: src.text_encoder.ctc_text_encoder.CTCTextEncoder
+  decoder_type: bs
+  beam_size: 10
+
+inferencer:
+  device_tensors: ["spectrogram", "text_encoded"]
+  device: auto
+  from_pretrained: outputs/test_100/checkpoint-epoch50.pth
+  save_path: "dev_clean/predictions"
+  seed: 42
+
+dataloader:
+  batch_size: 8
+  num_workers: 4
+  shuffle: false
+  pin_memory: true
+
+metrics:
+  inference:
+    - _target_: src.metrics.cer.CERMetric
+      name: cer
+    - _target_: src.metrics.wer.WERMetric
+      name: wer
+
+transforms:
+  instance_transforms:
+    inference:
+      get_spectrogram:
+        _target_: torchaudio.transforms.MelSpectrogram
+        sample_rate: 16000
+        n_mels: 80
+        n_fft: 400
+        hop_length: 160
+        power: 1.0
+  batch_transforms:
+    train: null
+    inference: null
+
+datasets:
+  dev:
+    _target_: src.datasets.librispeech_dataset.LibrispeechDataset
+    part: dev-clean
+    target_sr: 16000
+    instance_transforms: ${transforms.instance_transforms.inference}
