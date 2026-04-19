@@ -20,7 +20,7 @@ def main():
     os.makedirs("custom_dir/transcriptions", exist_ok=True)
     
     # Скачиваем датасет с Google Drive
-    print("\n📥 Скачивание датасета...")
+    print("\n Скачивание датасета...")
     os.system(f"gdown --folder {FOLDER_ID} -O temp_download --remaining-ok 2>/dev/null")
     
     # Файлы лежат в temp_download/121123/
