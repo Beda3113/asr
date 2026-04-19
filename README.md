@@ -420,3 +420,15 @@ python calc_metrics.py --pred_dir data/saved/dev_clean/predictions/dev
 
 ## Логи, чекпоинты 
 https://disk.yandex.ru/d/7tvoCqipddD4QA
+
+В ходе выполнения задания разработана ASR-система на DeepSpeech2 с CTC-декодированием. Модель (17.7M параметров) обучена 50 эпох на LibriSpeech train-clean-100 локально на Tesla V100 16GB. Batch size = 72, FP16 ускорил обучение в 1.8-2 раза. Оптимизатор — AdamW (lr=0.0001) с CosineAnnealingLR. Финальные метрики: Val CER 14.14%, Val WER 40.19%. Train loss снизился с 2.27 до 0.21. Разрыв train/val CER (6.5% vs 14.1%) указывает на переобучение. Оптимальная эпоха — 35-я (Val CER 15.7%, Val WER 44.7%). Реализованы собственная CTC-loss и ручной Beam Search. Добавлены 4 аугментации: Gain, PitchShift, AddColoredNoise, SpecAugment. CustomDirDataset, inference.py и calc_metrics.py работают с пользовательскими датасетами. Demo-ноутбук совместим с Google Colab.
+
+W&B не работал из-за региональных ограничений — замена на TensorBoard
+
+Низкая скорость загрузки данных — увеличение num_workers до 16, prefetch_factor=4
+
+Ошибки инференса (logits vs log_probs) — правка inferencer.py
+
+Фильтрация батчей в collate_fn — увеличение max_audio_length до 30
+
+Медленный скачивание LibriSpeech — использование зеркал OpenSLR
