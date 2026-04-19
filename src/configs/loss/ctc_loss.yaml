@@ -1,5 +1,0 @@
-# @package _global_
-_target_: src.loss.ctc_loss.CTCLossWrapper
-blank: 0
-zero_infinity: true
-reduction: mean
