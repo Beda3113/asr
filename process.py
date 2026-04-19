@@ -1,51 +1,38 @@
-
 import os
-import re
 import shutil
 from pathlib import Path
 
-def extract_folder_id(url):
-    match = re.search(r'/folders/([a-zA-Z0-9_-]+)', url)
-    if match:
-        return match.group(1)
-    match = re.search(r'id=([a-zA-Z0-9_-]+)', url)
-    if match:
-        return match.group(1)
-    if re.match(r'^[a-zA-Z0-9_-]+$', url):
-        return url
-    raise ValueError(f"Не удалось извлечь ID из ссылки: {url}")
-
-def process_dataset(FOLDER_URL):
+def process_downloaded():
     os.chdir("/content/asr")
     
-    FOLDER_ID = extract_folder_id(FOLDER_URL)
-    print(f"ID папки: {FOLDER_ID}")
-    
+    # Создаём целевые папки
     os.makedirs("custom_dir/audio", exist_ok=True)
     os.makedirs("custom_dir/transcriptions", exist_ok=True)
     
-    print("\nСкачивание датасета...")
-    os.system(f"gdown --folder {FOLDER_ID} -O temp_download --remaining-ok 2>/dev/null")
+    # Папка со скачанными файлами
+    source_dir = Path("downloaded_dataset")
     
-    temp_path = Path("temp_download")
+    if not source_dir.exists():
+        print("Папка downloaded_dataset не найдена")
+        print("Сначала запустите download.py")
+        return
+    
     audio_count = 0
     text_count = 0
     
-    for file in temp_path.rglob("*"):
+    # Ищем файлы рекурсивно
+    for file in source_dir.rglob("*"):
         if file.is_file():
             if file.suffix.lower() in ['.wav', '.mp3', '.flac', '.m4a', '.ogg']:
                 shutil.move(str(file), f"custom_dir/audio/{file.name}")
                 audio_count += 1
+                print(f"Аудио: {file.name}")
             elif file.suffix.lower() == '.txt':
                 shutil.move(str(file), f"custom_dir/transcriptions/{file.name}")
                 text_count += 1
+                print(f"Транскрипция: {file.name}")
     
-    shutil.rmtree("temp_download", ignore_errors=True)
-    
-    print(f"\nРезультат:")
-    print(f"   Аудио файлов: {audio_count}")
-    print(f"   Транскрипций: {text_count}")
-    
+    # Обрабатываем общий файл транскрипций
     trans_dir = Path("custom_dir/transcriptions")
     for trans_file in trans_dir.glob("*.trans.txt"):
         print(f"\nОбработка {trans_file.name}...")
@@ -56,19 +43,19 @@ def process_dataset(FOLDER_URL):
                     audio_id, text = parts[0], parts[1]
                     with open(trans_dir / f"{audio_id}.txt", 'w') as f_out:
                         f_out.write(text)
-                    print(f"   Создан: {audio_id}.txt")
+                    print(f"Создан: {audio_id}.txt")
         trans_file.unlink()
+    
+    # Удаляем исходную папку
+    shutil.rmtree(source_dir, ignore_errors=True)
     
     audio_files = list(Path("custom_dir/audio").glob("*.flac"))
     trans_files = list(Path("custom_dir/transcriptions").glob("*.txt"))
+    
     print(f"\nИтог:")
     print(f"   Аудио: {len(audio_files)} файлов")
     print(f"   Транскрипции: {len(trans_files)} файлов")
     print("\nДатасет готов к использованию!")
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1:
-        process_dataset(sys.argv[1])
-    else:
-        print("Укажите ссылку на папку Google Drive")
+    process_downloaded()
