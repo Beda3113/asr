@@ -1,4 +1,3 @@
-%%writefile asr_utils.py
 import os
 import shutil
 from pathlib import Path
